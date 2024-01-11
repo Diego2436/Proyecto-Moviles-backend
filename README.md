@@ -1,9 +1,4 @@
-# Foodtruck-Zacatengo-Movil-Backend
-Backend foodtruck movil zacatenco para app movil
-- Desarrollado en Django
-
-
-# Como Correr el backend en modo local
+# Correr el backend en modo local
 
 ## Requisitos Previos
 - Instalar Python >= 3.0
