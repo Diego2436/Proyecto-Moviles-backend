@@ -19,10 +19,11 @@
 - Crea una nueva base de datos en MySQL con el nombre "db_foodtruck" y usarla
    - Para mayor facilidad correr el script "db_foodtruck.sql" en Workbench que se encuentra en la carpeta "DataBase"
   <br>
-- Si requieres configurar el puerto del modo local o la contraseña de tu database, accede a: Proyecto_API/Proyecto_API/settings.py y en la variable DATABASES puedes configurar: ![Config host & DB](image.png)
+- Si requieres configurar el puerto del modo local o la contraseña de tu database, accede a: Proyecto_API/Proyecto_API/settings.py y en la variable DATABASES puedes configurar:
+  <br>![Config host & DB](image.png)<br>
   <br>
 - Ejecutar el .bat llamado "localhost.bat"
-  <br>
+  <br><br>
 - Ejecutar el servidor local
    - Usar: **python manage.py runserver**
    - Verifica tu modo local en tu navegador (comunmente es http://127.0.0.1:8000/)
