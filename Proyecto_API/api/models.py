@@ -7,6 +7,7 @@ class Usuario(models.Model):
     telefono = models.CharField(max_length=15, null=True)
     codigo = models.CharField(max_length=10, null=True)
     verificacion = models.CharField(max_length=3, default='NO')
+    tipo = models.CharField(max_length=10, default='user')
 
 class Tienda(models.Model):
     nombre = models.CharField(max_length=255, null=True)
