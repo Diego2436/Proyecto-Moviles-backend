@@ -24,6 +24,8 @@ Backend foodtruck movil zacatenco para app movil
 - Crea una nueva base de datos en MySQL con el nombre "db_foodtruck" y usarla
    - Para mayor facilidad correr el script "db_foodtruck.sql" en Workbench que se encuentra en la carpeta "DataBase"
   <br>
+- Si requieres configurar el puerto del modo local o la contraseña de tu database, accede a: Proyecto_API/Proyecto_API/settings.py y en la variable DATABASES puedes configurar: ![Config host & DB](image.png)
+  <br>
 - Ejecutar el .bat llamado "localhost.bat"
   <br>
 - Ejecutar el servidor local
