@@ -9,10 +9,7 @@ from django.db import migrations, models
 import django.db.models.deletion
 from django.db import migrations, models
 from decimal import Decimal
-import bcrypt
-import secrets
-import string
-import random
+import secrets, string, random
 
 def generar_contrasena_aleatoria(longitud=6):
     caracteres = string.ascii_letters + string.digits  # letras y dígitos
@@ -27,21 +24,12 @@ def generar_correo_aleatorio(nombre):
     correo_aleatorio = f"{nombre_sin_espacios}{numero_aleatorio}@{dominio_aleatorio}"
     return correo_aleatorio
 
-import random
-import string
-
 def generar_username(nombre):
     nombre_formateado = nombre.lower().replace(" ", "_", 1)
     caracteres_adicionales = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(4))
     username_generado = f"{nombre_formateado}_{caracteres_adicionales}"
 
     return username_generado
-
-# Ejemplo de uso
-nombre = "Ejemplo Nombre"
-username_generado = generar_username(nombre)
-print("Username generado:", username_generado)
-
 
 def cargar_datos_iniciales(apps, schema_editor):
     FoodTruck = apps.get_model('api', 'FoodTruck')
@@ -64,7 +52,7 @@ def cargar_datos_iniciales(apps, schema_editor):
                 
                 correo = generar_correo_aleatorio(nombre)
                 password_random = generar_contrasena_aleatoria()
-                codigo = (str(random.randint(100000, 999999)), 10)
+                codigo = secrets.token_hex(int(15/2))
                 username = generar_username(nombre)
 
                 rol = 'Empleado' if i < 2 else 'Repartidor'

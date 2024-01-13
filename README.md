@@ -22,7 +22,7 @@
 - Si requieres configurar el puerto del modo local o la contraseña de tu database, accede a: Proyecto_API/Proyecto_API/settings.py y en la variable DATABASES puedes configurar:
   <br>![Config host & DB](image.png)<br>
   <br>
-- Ejecutar el .bat llamado "localhost.bat"
+- Ejecutar el .bat llamado "run_localhost.bat"
   - Esto creara un entorno virtual donde se cargaran las dependencias, se haran las migraciones a la base de datos (creacion de tablas), se precargaran datos en la base de datos y por ultimo se ejecutara el servidor backend de manera local
   <br><br>
 

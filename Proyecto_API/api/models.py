@@ -24,6 +24,11 @@ class Empleado(models.Model):
     foodtruck = models.ForeignKey(FoodTruck, on_delete=models.CASCADE)
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
 
+class Cliente(models.Model):
+    nombre = models.CharField(max_length=50, null=True)
+    apellido = models.CharField(max_length=50, null=True)
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+
 class Pedido(models.Model):
     precio_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     fecha_pedido = models.CharField(max_length=45, null=True)

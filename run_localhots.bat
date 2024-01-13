@@ -7,5 +7,5 @@ echo Cargado Dependencias, espera un momento.
 pip install -r "requirements.txt"
 cd .\Proyecto_API
 python manage.py migrate
-::python manage.py runserver
+python manage.py runserver
 cmd /k
