@@ -1,15 +1,22 @@
 from django.db import models
+from django.contrib.auth.models import AbstractUser
 
 class FoodTruck(models.Model):
     nombre = models.CharField(max_length=255, null=True, default=None)
     descripcion = models.TextField(null=True, default=None)
 
-class Usuario(models.Model):
-    email = models.CharField(max_length=100, null=True, default=None)
-    password = models.CharField(max_length=50, null=True, default=None)
-    codigo = models.CharField(max_length=10, null=True, default=None)
+class Usuario(AbstractUser):
+    codigo = models.CharField(max_length=25, null=True, default=None)
     verificacion = models.CharField(max_length=3, default='NO')
     tipo = models.CharField(max_length=10, default='user')
+
+    class Meta:
+        db_table = 'api_usuarios' # El nombre de la tabla de usuarios 
+
+    first_name = None
+    last_name = None
+    last_login = None
+    date_joined = None
 
 class Empleado(models.Model):
     nombre = models.CharField(max_length=50, null=True)
