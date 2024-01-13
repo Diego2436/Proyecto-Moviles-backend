@@ -71,7 +71,7 @@ def cargar_datos_iniciales(apps, schema_editor):
 
                 # Save employee data to the text file
                 file.write(f"Email: {correo}\n")
-                file.write(f"Username: {correo}\n")
+                file.write(f"Username: {username}\n")
                 file.write(f"Password: {password_random}\n")
                 file.write(f"Nombre: {nombre}\n")
                 file.write(f"Rol: {rol}\n")

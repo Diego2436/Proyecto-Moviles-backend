@@ -14,7 +14,7 @@ from api.serializers import FoodTruckSerializer
 from api.models import FoodTruck
 
 class FoodTruckSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     queryset = FoodTruck.objects.all().order_by('id')
     serializer_class = FoodTruckSerializer
 
