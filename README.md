@@ -23,7 +23,10 @@
   <br>![Config host & DB](image.png)<br>
   <br>
 - Ejecutar el .bat llamado "localhost.bat"
+  - Esto creara un entorno virtual donde se cargaran las dependencias, se haran las migraciones a la base de datos (creacion de tablas), se precargaran datos en la base de datos y por ultimo se ejecutara el servidor backend de manera local
   <br><br>
+
+## Ejecutar servidor local
 - Ejecutar el servidor local
    - Usar: **python manage.py runserver**
    - Verifica tu modo local en tu navegador (comunmente es http://127.0.0.1:8000/)
