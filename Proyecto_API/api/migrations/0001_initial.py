@@ -52,7 +52,7 @@ def cargar_datos_iniciales(apps, schema_editor):
                 
                 correo = generar_correo_aleatorio(nombre)
                 password_random = generar_contrasena_aleatoria()
-                codigo = secrets.token_hex(int(15/2))
+                codigo = secrets.token_hex(int(20/2))
                 username = generar_username(nombre)
 
                 rol = 'Empleado' if i < 2 else 'Repartidor'

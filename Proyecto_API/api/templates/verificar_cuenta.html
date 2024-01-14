@@ -1,0 +1,16 @@
+<!-- verificar_cuenta.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verificación de Cuenta</title>
+</head>
+<body>
+    <h1>Verificación de Cuenta</h1>
+    {% if mensaje %}
+        <p>{{ mensaje }}</p>
+    {% elif error %}
+        <p>Error: {{ error }}</p>
+    {% endif %}
+</body>
+</html>
