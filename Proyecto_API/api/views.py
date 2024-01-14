@@ -12,10 +12,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
 
-
 # Importando Modelos y Servicios
-from api.models import Usuario, Cliente
+from api.models import Usuario, Cliente, Producto, ProductoHasCategoria, Categoria, Pedido, DetallesPedido, Empleado
 from api.services import sendEmail, random_password
+
 
 # JSON FORMAT: { "nombre": "Oscar David", "apellido": "Romero Hernández", "usuario": "dfg161", "correo": "(tu correo)@outlook.com", "password": "12345" }
 @api_view(['POST'])
@@ -67,6 +67,7 @@ def registro(request):
     # Si la solicitud no es POST, devolver un error
     return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET'])
 def verificar_cuenta(request):
     if request.method == 'GET':
@@ -94,6 +95,7 @@ def verificar_cuenta(request):
 
     # Si la solicitud no es GET, devolver un error
     return render(request, 'verificar_cuenta.html', {'error': 'Se esperaba una solicitud GET'})
+
 
 # JSON FORMAT: { "usuario": "dfg161", "password": "12345"}
 @api_view(['POST'])
@@ -136,6 +138,7 @@ def iniciar_sesion(request):
         # Si la solicitud no es POST, devolver un error
         return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 # JSON FORMAT: { "correo": "javiermartinez506@yahoo.com"}
 @api_view(['POST'])
 def recuperar_password(request):
@@ -162,3 +165,207 @@ def recuperar_password(request):
 
     # Si la solicitud no es POST, devolver un error
     return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def consultar_catalogo(request):
+    if request.method == 'GET':
+        try:
+            # Obtener todos los productos disponibles
+            productos = Producto.objects.all()
+
+            # Crear una lista de diccionarios con los datos de los productos para los usuarios
+            lista_productos = [
+                {
+                    'nombre': producto.nombre,
+                    'descripcion': producto.descripcion,
+                    'precio': producto.precio,
+                    'imagen': producto.imagen
+                }
+                for producto in productos
+            ]
+
+            # Devolver la lista de productos en formato JSON
+            return Response(lista_productos, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({'error': 'Se esperaba una solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def filtrar_productos(request):
+    if request.method == 'POST':
+        # Obtener el nombre de la categoría del cuerpo de la solicitud
+        categoria_nombre = request.data.get('categoria_nombre')
+
+        # Filtrar productos por nombre de categoría usando la relación ProductoHasCategoria
+        if categoria_nombre:
+            categoria = Categoria.objects.get(categoria=categoria_nombre)
+            productos_categoria = ProductoHasCategoria.objects.filter(categoria=categoria)
+            productos = [detalle.producto for detalle in productos_categoria]
+            # Crear una lista de diccionarios con la información básica de los productos
+            productos_info = [{'nombre': producto.nombre, 'descripcion': producto.descripcion, 'precio': producto.precio} for producto in productos]
+            # Devolver la respuesta
+            return Response(productos_info)
+
+    return Response({'error': 'Se esperaba una solicitud POST con el nombre de la categoría'})
+
+
+@api_view(['GET'])
+def ver_pedidos(request):
+    if request.method == 'GET':
+        # Verificar si el usuario es un empleado
+        if request.user.is_authenticated and request.user.tipo == 'employee':
+            # Si es un empleado, obtener los pedidos asignados a ese empleado
+            pedidos = Pedido.objects.filter(empleado=request.user.empleado)
+        else:
+            # Si no es un empleado, obtener todos los pedidos
+            pedidos = Pedido.objects.all()
+
+        # Crear una lista de diccionarios con la información básica de los pedidos
+        pedidos_info = [
+            {
+                'precio_total': pedido.precio_total,
+                'fecha_pedido': pedido.fecha_pedido,
+                'estado': pedido.estado,
+                # Incluir cualquier otro campo que desees mostrar en la respuesta
+            }
+            for pedido in pedidos
+        ]
+
+        # Devolver la respuesta directamente sin serialización
+        return Response(pedidos_info)
+
+    return Response({'error': 'Se esperaba una solicitud GET'})
+
+
+#path('api/cuenta/ver-detallles-pedido/1)
+@api_view(['GET'])
+def ver_detalles_pedido(request, pedido_id):
+    if request.method == 'GET':
+        try:
+            # Obtener el pedido asociado al pedido_id
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Verificar si el usuario autenticado es un empleado asociado al pedido
+            if request.user.is_authenticated and request.user.tipo == 'employee' and pedido.empleado.usuario == request.user:
+                # Obtener los detalles del pedido
+                detalles_pedido = DetallesPedido.objects.filter(pedido=pedido)
+
+                # Crear una lista de diccionarios con la información básica de los detalles del pedido
+                detalles_pedido_info = [
+                    {
+                        'cantidad': detalle.cantidad,
+                        'producto_nombre': detalle.producto.nombre,
+                        'producto_descripcion': detalle.producto.descripcion,
+                        'producto_precio': detalle.producto.precio,
+                        # Incluir cualquier otro campo que desees mostrar en la respuesta
+                    }
+                    for detalle in detalles_pedido
+                ]
+
+                # Devolver la respuesta
+                return Response(detalles_pedido_info)
+            else:
+                return Response({'error': 'No tienes permisos para ver los detalles de este pedido'}, status=403)
+
+        except Pedido.DoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=404)
+
+    return Response({'error': 'Se esperaba una solicitud GET'})
+
+
+@api_view(['POST'])
+def cancelar_pedido(request, pedido_id):
+    if request.method == 'POST':
+        try:
+            # Obtener el pedido que se va a cancelar
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Verificar si el usuario autenticado es un empleado asociado al pedido
+            if request.user.is_authenticated and request.user.tipo == 'employee' and pedido.empleado.usuario == request.user:
+                # Verificar si el pedido ya está cancelado
+                if pedido.estado == 'Cancelado':
+                    return Response({'error': 'El pedido ya está cancelado'}, status=400)
+
+                # Actualizar el estado del pedido a 'Cancelado'
+                pedido.estado = 'Cancelado'
+                pedido.save()
+
+                return Response({'mensaje': 'Pedido cancelado exitosamente'}, status=200)
+            else:
+                return Response({'error': 'No tienes permisos para cancelar este pedido'}, status=403)
+
+        except Pedido.DoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=404)
+
+    return Response({'error': 'Se esperaba una solicitud POST'})
+
+
+@api_view(['POST'])
+def asignar_pedido(request, pedido_id):
+    if request.method == 'POST':
+        try:
+            # Obtener el pedido que se va a asignar
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Verificar si el pedido ya está asignado
+            if pedido.empleado:
+                return Response({'error': 'El pedido ya está asignado a un empleado'}, status=400)
+
+            # Verificar el permiso del usuario autenticado
+            if not request.user.is_authenticated or request.user.tipo != 'employee':
+                return Response({'error': 'No tienes permisos para asignar pedidos'}, status=403)
+
+            # Obtener la lista de empleados disponibles para asignar el pedido
+            empleados_disponibles = Empleado.objects.filter(foodtruck=pedido.foodtruck, usuario=request.user, usuario__is_active=True)
+
+            # Asignar el pedido al primer empleado disponible (puedes personalizar la lógica según tus necesidades)
+            if empleados_disponibles:
+                empleado_asignado = empleados_disponibles[0]
+                pedido.empleado = empleado_asignado
+                pedido.save()
+
+                return Response({'mensaje': f'Pedido asignado exitosamente'}, status=200)
+            else:
+                return Response({'error': 'No estás autorizado para asignar pedidos o no hay empleados disponibles'}, status=403)
+
+        except Pedido.DoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=404)
+
+    return Response({'error': 'Se esperaba una solicitud POST'})
+
+
+@api_view(['GET'])
+def consultar_pedidos_asignados(request):
+    if request.method == 'GET':
+        try:
+            # Verificar si el usuario autenticado es un empleado
+            if request.user.is_authenticated and request.user.tipo == 'employee':
+                # Obtener los pedidos asignados a ese empleado
+                pedidos_asignados = Pedido.objects.filter(empleado=request.user.empleado)
+
+                # Crear una lista de diccionarios con la información básica de los pedidos asignados
+                pedidos_info = [
+                    {
+                        'precio_total': pedido.precio_total,
+                        'fecha_pedido': pedido.fecha_pedido,
+                        'estado': pedido.estado,
+                        # Incluir cualquier otro campo que desees mostrar en la respuesta
+                    }
+                    for pedido in pedidos_asignados
+                ]
+
+                # Devolver la respuesta directamente sin serialización
+                return Response(pedidos_info)
+            else:
+                return Response({'error': 'No tienes permisos para consultar pedidos asignados'}, status=403)
+
+        except Exception as e:
+            return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({'error': 'Se esperaba una solicitud GET'})
+
+
