@@ -34,10 +34,10 @@ class Pedido(models.Model):
     fecha_pedido = models.CharField(max_length=45, null=True)
     fecha_entrega = models.CharField(max_length=45, null=True)
     fecha_repartidor = models.CharField(max_length=45, null=True)
-    estado = models.CharField(max_length=20, null=True)
+    estado = models.CharField(max_length=100, null=True)
     direccion = models.CharField(max_length=400, null=True)
     foodtruck = models.ForeignKey(FoodTruck, on_delete=models.CASCADE)
-    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE)
+    empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, null=True)
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
 
 class Producto(models.Model):

@@ -7,18 +7,26 @@ from rest_framework_simplejwt import views as jwt_views
 from api import views as endpoint 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/cuenta/registrar/', endpoint.registro),
-    path('api/cuenta/verificar/', endpoint.verificar_cuenta),
-    path('api/cuenta/iniciar-sesion/', endpoint.iniciar_sesion),
-    path('api/cuenta/recuperar-password/', endpoint.recuperar_password),
-    path('api/cuenta/catalogo/', endpoint.consultar_catalogo),
-    path('api/cuenta/filtrar-productos/', endpoint.filtrar_productos),
-    path('api/cuenta/ver-pedidos/', endpoint.ver_pedidos),
-    path('api/cuenta/ver-detallles-pedido/', endpoint.ver_detalles_pedido),
-    path('api/cuenta/cancelar-pedido/', endpoint.cancelar_pedido),  
-    path('api/cuenta/asignar-pedido/', endpoint.asignar_pedido),
-    path('api/cuenta/consultar-pedidos-asignados/', endpoint.consultar_pedidos_asignados),
+    path('api/admin/', admin.site.urls),
+
+    path('api/usuario/iniciar-sesion/', endpoint.iniciar_sesion),
+    path('api/usuario/recuperar-password/', endpoint.recuperar_password),
+    path('api/usuario/ver-pedidos/', endpoint.ver_pedidos),
+    path('api/usuario/ver-detallles-pedido/', endpoint.ver_detalles_pedido),
+
+    path('api/cliente/registrar/', endpoint.registro),
+    path('api/cliente/verificar/', endpoint.verificar_cuenta),
+    path('api/cliente/ver-productos/', endpoint.ver_productos),
+    path('api/cliente/filtrar-productos-categoria/', endpoint.filtrar_productos_categoria),
+    path('api/cliente/filtrar-productos-foodtruck/', endpoint.filtrar_productos_foodtruck),
+    path('api/cliente/filtrar-foodtruck/', endpoint.obtener_foodtrucks),
+    path('api/cliente/realizar-pedido/', endpoint.realizar_pedido),
+      
+    path('api/empleado/asignar-pedido/', endpoint.asignar_pedido_a_empleado),
+    path('api/empleado/consultar-pedidos-asignados/', endpoint.consultar_pedidos_asignados),
+    path('api/empleado/obtener-repartidores/', endpoint.obtener_repartidores),
+    path('api/empleado/entregar-pedido/', endpoint.entregar_pedido),
+
     path('api/token/', jwt_views.TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', jwt_views.TokenRefreshView.as_view(), name='token_refresh'),
 ]

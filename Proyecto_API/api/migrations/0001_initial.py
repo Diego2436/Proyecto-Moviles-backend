@@ -80,6 +80,17 @@ def cargar_datos_iniciales(apps, schema_editor):
                 # Create Empleado (Employee) object in the database and associate with the user
                 Empleado.objects.create(nombre=nombre, rol=rol, foodtruck=foodtruck, usuario=usuario)
 
+    # Precargar usuario Cliente de prueba
+    usuario = Usuario.objects.create_user(password="12345",
+                                    is_superuser=0,
+                                    username = "testUser",
+                                    email="test@outlook.com",
+                                    is_staff=0,
+                                    is_active=1,
+                                    codigo="075487c0b3609c5cfd98",
+                                    verificacion="YES",
+                                    tipo="user")
+
     # Crear Productos para FoodTruck 1
     Producto.objects.create(nombre='Tacos al Pastor', descripcion='Tacos de cerdo adobado con piña', precio=Decimal('30.00'), imagen='fd1_tacos_al_pastor.jpg', foodtruck=foodtruck1)
     Producto.objects.create(nombre='Quesadillas Mixtas', descripcion='Quesadillas con variedad de quesos y guarniciones', precio=Decimal('25.50'), imagen='fd1_quesadillas_mixtas.jpg',foodtruck=foodtruck1)
@@ -209,9 +220,9 @@ class Migration(migrations.Migration):
                 ('fecha_pedido', models.CharField(max_length=45, null=True)),
                 ('fecha_entrega', models.CharField(max_length=45, null=True)),
                 ('fecha_repartidor', models.CharField(max_length=45, null=True)),
-                ('estado', models.CharField(max_length=20, null=True)),
+                ('estado', models.CharField(max_length=100, null=True)),
                 ('direccion', models.CharField(max_length=400, null=True)),
-                ('empleado', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='api.empleado')),
+                ('empleado', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='api.empleado', null=True)),
                 ('foodtruck', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='api.foodtruck')),
                 ('usuario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],

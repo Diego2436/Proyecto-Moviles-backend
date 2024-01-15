@@ -3,6 +3,7 @@ from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from datetime import datetime
 import secrets
 
 # Elementos necesarios para que el API REST funcione 
@@ -13,11 +14,12 @@ from rest_framework.decorators import api_view
 from rest_framework import status
 
 # Importando Modelos y Servicios
-from api.models import Usuario, Cliente, Producto, ProductoHasCategoria, Categoria, Pedido, DetallesPedido, Empleado
+from api.models import Usuario, Cliente, Producto, ProductoHasCategoria, Categoria, Pedido, DetallesPedido, Empleado, FoodTruck
 from api.services import sendEmail, random_password
 
 
-# JSON FORMAT: { "nombre": "Oscar David", "apellido": "Romero Hernández", "usuario": "dfg161", "correo": "(tu correo)@outlook.com", "password": "12345" }
+# JSON FE: { "nombre": "Oscar David", "apellido": "Romero Hernández", "usuario": "dfg161", "correo": "(tu correo)@outlook.com", "password": "12345" }
+# JSON BE: { 'mensaje': '¡Se ha registrado correctamente el usuario, para verificar la cuenta se ha enviado un enlace a tu correo!' }
 @api_view(['POST'])
 def registro(request):
     if request.method == 'POST':
@@ -67,7 +69,7 @@ def registro(request):
     # Si la solicitud no es POST, devolver un error
     return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
 
-
+# JSON BE: { 'mensaje/error': Depende el mensaje o error' }
 @api_view(['GET'])
 def verificar_cuenta(request):
     if request.method == 'GET':
@@ -97,19 +99,21 @@ def verificar_cuenta(request):
     return render(request, 'verificar_cuenta.html', {'error': 'Se esperaba una solicitud GET'})
 
 
-# JSON FORMAT: { "usuario": "dfg161", "password": "12345"}
+# JSON FE: { "user": "dfg161", "password": "12345"}
+# JSON BE: { "mensaje": "Se inició sesión correctamente", "token": "2a9abeed3f70e3769f9c"}
 @api_view(['POST'])
 def iniciar_sesion(request):
     if request.method == 'POST':
         try:
             # Obtener los datos del cuerpo de la solicitud POST
             data = request.data
-            username = data["usuario"]
+            username = data["user"]
             password = data["password"]
 
             # Obtener el usuario
             try:
                 usuario = Usuario.objects.get(username=username)
+                token = usuario.codigo
 
                 # Verificar si la cuenta ya se validó
                 if usuario.verificacion == "NO":
@@ -119,7 +123,7 @@ def iniciar_sesion(request):
                 # Verificar la contraseña
                 if check_password(password, usuario.password):
                     # Contraseña válida, usuario autenticado
-                    respuesta = {'mensaje': 'Se inició sesión correctamente'}
+                    respuesta = {'mensaje': 'Se inició sesión correctamente', 'token': token}
                     return Response(respuesta, status=status.HTTP_200_OK)
                 else:
                     # Contraseña no válida
@@ -139,7 +143,8 @@ def iniciar_sesion(request):
         return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# JSON FORMAT: { "correo": "javiermartinez506@yahoo.com"}
+# JSON FE: { "correo": "javiermartinez506@yahoo.com"}
+# JSON BE: {'mensaje': 'Se ha enviado con éxito una nueva contraseña a su correo.'}
 @api_view(['POST'])
 def recuperar_password(request):
     if request.method == 'POST':
@@ -166,9 +171,9 @@ def recuperar_password(request):
     # Si la solicitud no es POST, devolver un error
     return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
 
-
+# JSON BE: {'productos': [{'nombre': <str>, 'descripcion': <str>, 'precio': <float>, 'imagen': <str>}, ...]}
 @api_view(['GET'])
-def consultar_catalogo(request):
+def ver_productos(request):
     if request.method == 'GET':
         try:
             # Obtener todos los productos disponibles
@@ -177,195 +182,427 @@ def consultar_catalogo(request):
             # Crear una lista de diccionarios con los datos de los productos para los usuarios
             lista_productos = [
                 {
+                    'id': producto.id,
                     'nombre': producto.nombre,
                     'descripcion': producto.descripcion,
                     'precio': producto.precio,
-                    'imagen': producto.imagen
+                    'imagen': producto.imagen,
+                    'id_foodtruck': producto.foodtruck_id,
                 }
                 for producto in productos
             ]
 
             # Devolver la lista de productos en formato JSON
-            return Response(lista_productos, status=status.HTTP_200_OK)
+            respuesta = {'productos': lista_productos}
+            return Response(respuesta, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response({'error': 'Se esperaba una solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
 
-
+# JSON FE: {"categoria": "tacos"}
+# JSON BE: {'productos': [{'nombre': <str>, 'descripcion': <str>, 'precio': <float>}, ...]}
 @api_view(['POST'])
-def filtrar_productos(request):
+def filtrar_productos_categoria(request):
     if request.method == 'POST':
-        # Obtener el nombre de la categoría del cuerpo de la solicitud
-        categoria_nombre = request.data.get('categoria_nombre')
+        try:
+            # Obtener el nombre de la categoría del cuerpo de la solicitud
+            categoria_nombre = request.data.get('categoria')
 
-        # Filtrar productos por nombre de categoría usando la relación ProductoHasCategoria
-        if categoria_nombre:
+            # Validar si se proporcionó el nombre de la categoría
+            if not categoria_nombre:
+                return Response({'error': 'El nombre de la categoría es obligatorio en la solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Obtener productos asociados a la categoría
             categoria = Categoria.objects.get(categoria=categoria_nombre)
             productos_categoria = ProductoHasCategoria.objects.filter(categoria=categoria)
             productos = [detalle.producto for detalle in productos_categoria]
+
             # Crear una lista de diccionarios con la información básica de los productos
-            productos_info = [{'nombre': producto.nombre, 'descripcion': producto.descripcion, 'precio': producto.precio} for producto in productos]
-            # Devolver la respuesta
-            return Response(productos_info)
+            lista_productos = [
+                {
+                    'id': producto.id,
+                    'nombre': producto.nombre,
+                    'descripcion': producto.descripcion,
+                    'precio': producto.precio,
+                    'imagen': producto.imagen,
+                    'id_foodtruck': producto.foodtruck_id,
+                }
+                for producto in productos
+            ]
 
-    return Response({'error': 'Se esperaba una solicitud POST con el nombre de la categoría'})
+            # Devolver la respuesta en formato JSON
+            respuesta = {'productos': lista_productos}
+            return Response(respuesta, status=status.HTTP_200_OK)
 
+        except Categoria.DoesNotExist:
+            return Response({'error': 'La categoría especificada no existe'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])
-def ver_pedidos(request):
-    if request.method == 'GET':
-        # Verificar si el usuario es un empleado
-        if request.user.is_authenticated and request.user.tipo == 'employee':
-            # Si es un empleado, obtener los pedidos asignados a ese empleado
-            pedidos = Pedido.objects.filter(empleado=request.user.empleado)
-        else:
-            # Si no es un empleado, obtener todos los pedidos
-            pedidos = Pedido.objects.all()
+    return Response({'error': 'Se esperaba una solicitud POST con el nombre de la categoría'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Crear una lista de diccionarios con la información básica de los pedidos
-        pedidos_info = [
-            {
-                'precio_total': pedido.precio_total,
-                'fecha_pedido': pedido.fecha_pedido,
-                'estado': pedido.estado,
-                # Incluir cualquier otro campo que desees mostrar en la respuesta
-            }
-            for pedido in pedidos
-        ]
-
-        # Devolver la respuesta directamente sin serialización
-        return Response(pedidos_info)
-
-    return Response({'error': 'Se esperaba una solicitud GET'})
-
-
-#path('api/cuenta/ver-detallles-pedido/1)
-@api_view(['GET'])
-def ver_detalles_pedido(request, pedido_id):
-    if request.method == 'GET':
-        try:
-            # Obtener el pedido asociado al pedido_id
-            pedido = Pedido.objects.get(id=pedido_id)
-
-            # Verificar si el usuario autenticado es un empleado asociado al pedido
-            if request.user.is_authenticated and request.user.tipo == 'employee' and pedido.empleado.usuario == request.user:
-                # Obtener los detalles del pedido
-                detalles_pedido = DetallesPedido.objects.filter(pedido=pedido)
-
-                # Crear una lista de diccionarios con la información básica de los detalles del pedido
-                detalles_pedido_info = [
-                    {
-                        'cantidad': detalle.cantidad,
-                        'producto_nombre': detalle.producto.nombre,
-                        'producto_descripcion': detalle.producto.descripcion,
-                        'producto_precio': detalle.producto.precio,
-                        # Incluir cualquier otro campo que desees mostrar en la respuesta
-                    }
-                    for detalle in detalles_pedido
-                ]
-
-                # Devolver la respuesta
-                return Response(detalles_pedido_info)
-            else:
-                return Response({'error': 'No tienes permisos para ver los detalles de este pedido'}, status=403)
-
-        except Pedido.DoesNotExist:
-            return Response({'error': 'Pedido no encontrado'}, status=404)
-
-    return Response({'error': 'Se esperaba una solicitud GET'})
-
-
+# JSON FE: {"id_foodtruck": "1"}
+# JSON BE: {'productos': [{'nombre': <str>, 'descripcion': <str>, 'precio': <float>}, ...]}
 @api_view(['POST'])
-def cancelar_pedido(request, pedido_id):
+def filtrar_productos_foodtruck(request):
     if request.method == 'POST':
         try:
-            # Obtener el pedido que se va a cancelar
-            pedido = Pedido.objects.get(id=pedido_id)
+            # Obtener el id_foodtruck del cuerpo de la solicitud
+            id_foodtruck = request.data.get('id_foodtruck')
 
-            # Verificar si el usuario autenticado es un empleado asociado al pedido
-            if request.user.is_authenticated and request.user.tipo == 'employee' and pedido.empleado.usuario == request.user:
-                # Verificar si el pedido ya está cancelado
-                if pedido.estado == 'Cancelado':
-                    return Response({'error': 'El pedido ya está cancelado'}, status=400)
+            # Validar si se proporcionó el id_foodtruck
+            if not id_foodtruck:
+                return Response({'error': 'El id_foodtruck es obligatorio en la solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
 
-                # Actualizar el estado del pedido a 'Cancelado'
-                pedido.estado = 'Cancelado'
-                pedido.save()
+            # Obtener productos asociados al id_foodtruck
+            productos = Producto.objects.filter(foodtruck_id=id_foodtruck)
 
-                return Response({'mensaje': 'Pedido cancelado exitosamente'}, status=200)
-            else:
-                return Response({'error': 'No tienes permisos para cancelar este pedido'}, status=403)
+            # Crear una lista de diccionarios con la información básica de los productos
+            lista_productos = [
+                {
+                    'id': producto.id,
+                    'nombre': producto.nombre,
+                    'descripcion': producto.descripcion,
+                    'precio': producto.precio,
+                    'imagen': producto.imagen,
+                    'id_foodtruck': producto.foodtruck_id,
+                }
+                for producto in productos
+            ]
 
-        except Pedido.DoesNotExist:
-            return Response({'error': 'Pedido no encontrado'}, status=404)
+            # Devolver la respuesta en formato JSON
+            respuesta = {'productos': lista_productos}
+            return Response(respuesta, status=status.HTTP_200_OK)
 
-    return Response({'error': 'Se esperaba una solicitud POST'})
+        except FoodTruck.DoesNotExist:
+            return Response({'error': 'El foodtruck especificado no existe'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    return Response({'error': 'Se esperaba una solicitud POST con el id_foodtruck'}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
-def asignar_pedido(request, pedido_id):
-    if request.method == 'POST':
-        try:
-            # Obtener el pedido que se va a asignar
-            pedido = Pedido.objects.get(id=pedido_id)
-
-            # Verificar si el pedido ya está asignado
-            if pedido.empleado:
-                return Response({'error': 'El pedido ya está asignado a un empleado'}, status=400)
-
-            # Verificar el permiso del usuario autenticado
-            if not request.user.is_authenticated or request.user.tipo != 'employee':
-                return Response({'error': 'No tienes permisos para asignar pedidos'}, status=403)
-
-            # Obtener la lista de empleados disponibles para asignar el pedido
-            empleados_disponibles = Empleado.objects.filter(foodtruck=pedido.foodtruck, usuario=request.user, usuario__is_active=True)
-
-            # Asignar el pedido al primer empleado disponible (puedes personalizar la lógica según tus necesidades)
-            if empleados_disponibles:
-                empleado_asignado = empleados_disponibles[0]
-                pedido.empleado = empleado_asignado
-                pedido.save()
-
-                return Response({'mensaje': f'Pedido asignado exitosamente'}, status=200)
-            else:
-                return Response({'error': 'No estás autorizado para asignar pedidos o no hay empleados disponibles'}, status=403)
-
-        except Pedido.DoesNotExist:
-            return Response({'error': 'Pedido no encontrado'}, status=404)
-
-    return Response({'error': 'Se esperaba una solicitud POST'})
-
-
+# JSON BE: {'foodtrucks': []}
 @api_view(['GET'])
-def consultar_pedidos_asignados(request):
+def obtener_foodtrucks(request):
     if request.method == 'GET':
         try:
-            # Verificar si el usuario autenticado es un empleado
-            if request.user.is_authenticated and request.user.tipo == 'employee':
-                # Obtener los pedidos asignados a ese empleado
-                pedidos_asignados = Pedido.objects.filter(empleado=request.user.empleado)
+            # Obtener todos los FoodTrucks
+            foodtrucks = FoodTruck.objects.all()
 
-                # Crear una lista de diccionarios con la información básica de los pedidos asignados
-                pedidos_info = [
-                    {
-                        'precio_total': pedido.precio_total,
-                        'fecha_pedido': pedido.fecha_pedido,
-                        'estado': pedido.estado,
-                        # Incluir cualquier otro campo que desees mostrar en la respuesta
-                    }
-                    for pedido in pedidos_asignados
-                ]
+            # Crear una lista de diccionarios con los atributos de cada FoodTruck
+            lista_foodtrucks = []
+            for foodtruck in foodtrucks:
+                foodtruck_info = {
+                    'id': foodtruck.id,
+                    'nombre': foodtruck.nombre,
+                    'descripcion': foodtruck.descripcion,
+                }
+                lista_foodtrucks.append(foodtruck_info)
 
-                # Devolver la respuesta directamente sin serialización
-                return Response(pedidos_info)
-            else:
-                return Response({'error': 'No tienes permisos para consultar pedidos asignados'}, status=403)
+            return Response({'foodtrucks': lista_foodtrucks}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    return Response({'error': 'Se esperaba una solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
+
+# JSON FE: {"user": "dfg161"}
+# JSON BE: {'pedidos': []}
+@api_view(['GET'])
+def ver_pedidos(request):
+    if request.method == 'GET':
+        try:
+            # Obtener el nombre de usuario del cuerpo de la solicitud
+            username = request.data.get('user')
+            
+            # Obtener el objeto Usuario basado en el nombre de usuario
+            usuario = Usuario.objects.get(username=username)
+            cliente = Cliente.objects.get(usuario_id=usuario.id)
+
+            # Obtener todos los pedidos asociados a ese usuario
+            pedidos = Pedido.objects.filter(usuario_id=usuario.id)
+
+            # Crear una lista de diccionarios con la información de cada pedido
+            lista_pedidos = []
+            for pedido in pedidos:
+                pedido_info = {
+                    'id': pedido.id,
+                    'precio_total': pedido.precio_total,
+                    'fecha_pedido': pedido.fecha_pedido,
+                    'fecha_entrega': pedido.fecha_entrega,
+                    'fecha_repartidor': pedido.fecha_repartidor,
+                    'estado': pedido.estado,
+                    'direccion': pedido.direccion,
+                    'foodtruck': pedido.foodtruck.nombre,
+                    'empleado': pedido.empleado.nombre,
+                    'usuario': pedido.usuario.username,
+                    'cliente': f"{cliente.nombre} {cliente.apellido}",
+                }
+                lista_pedidos.append(pedido_info)
+
+            return Response({'pedidos': lista_pedidos}, status=status.HTTP_200_OK)
+
+        except Usuario.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({'error': 'Se esperaba una solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
+
+# JSON FE: { "pedido_id": "1"}
+# JSON BE: {'detalles_pedido': []}
+@api_view(['GET'])
+def ver_detalles_pedido(request):
+    if request.method == 'GET':
+        try:
+            # Obtener el pedido asociado al pedido_id
+            pedido_id = request.data.get('pedido_id')
+            print(pedido_id)
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Obtener los detalles del pedido
+            detalles_pedido = DetallesPedido.objects.filter(pedido=pedido)
+
+            # Crear una lista de diccionarios con la información básica de los detalles del pedido
+            detalles_pedido_info = [
+                {
+                    'cantidad': detalle.cantidad,
+                    'producto_nombre': detalle.producto.nombre,
+                    'producto_descripcion': detalle.producto.descripcion,
+                    'producto_precio': detalle.producto.precio,
+                }
+                for detalle in detalles_pedido
+            ]
+
+            # Devolver la respuesta
+            return Response({'detalles_pedido': detalles_pedido_info}, status=status.HTTP_200_OK)
+
+        except ObjectDoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=404)
+
     return Response({'error': 'Se esperaba una solicitud GET'})
 
 
+# JSON FE: { "pedido_id": "1"}
+# JSON BE: {'mensaje': 'Pedido cancelado exitosamente'}
+@api_view(['PATCH'])
+def cancelar_pedido(request):
+    if request.method == 'PATCH':
+        try:
+            # Obtener el pedido que se va a cancelar
+            pedido_id = request.data.get('pedido_id')
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Verificar si el pedido ya está cancelado
+            if pedido.estado == 'Cancelado':
+                return Response({'error': 'El pedido ya está cancelado'}, status=400)
+
+            # Actualizar el estado del pedido a 'Cancelado'
+            pedido.estado = 'Cancelado'
+            pedido.save()
+
+            return Response({'mensaje': 'Pedido cancelado exitosamente'}, status=200)
+
+
+        except ObjectDoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=404)
+
+    return Response({'error': 'Se esperaba una solicitud DELETE'})
+
+# JSON FE: { "pedido_id": "1", "empleado_id": "3"}
+# JSON BE: {'mensaje': 'Pedido cancelado exitosamente'}
+@api_view(['PATCH'])
+def asignar_pedido_a_empleado(request):
+    if request.method == 'PATCH':
+        try:
+            # Obtener el pedido_id y el empleado_id del cuerpo de la solicitud
+            pedido_id = request.data.get('pedido_id')
+            empleado_id = request.data.get('empleado_id')
+
+            # Verificar si se proporcionaron ambos IDs
+            if not pedido_id or not empleado_id:
+                return Response({'error': 'Se esperaban los IDs del pedido y del empleado en la solicitud PATCH'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Obtener el pedido y el empleado asociados a los IDs proporcionados
+            pedido = Pedido.objects.get(id=pedido_id)
+            empleado = Empleado.objects.get(id=empleado_id)
+
+            # Verificar si el pedido ya está asignado a un empleado
+            if pedido.empleado is not None:
+                return Response({'error': 'El pedido ya está asignado a un empleado'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Asignar el pedido al empleado
+            pedido.empleado = empleado
+            pedido.fecha_repartidor = datetime.now()
+            pedido.estado = "En Curso"
+            pedido.save()
+
+            return Response({'mensaje': 'Pedido asignado exitosamente a empleado'}, status=status.HTTP_200_OK)
+
+        except ObjectDoesNotExist:
+            return Response({'error': 'Pedido o empleado no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'error': 'Se esperaba una solicitud PATCH'}, status=status.HTTP_400_BAD_REQUEST)
+
+# JSON FE: { "empleado_id": "3"}
+# JSON BE: {'pedidos': []}
+@api_view(['GET'])
+def consultar_pedidos_asignados(request):
+    if request.method == 'GET':
+        try:
+            # Obtener el empleado_id del parámetro de consulta "empleado_id"
+            empleado_id = request.data.get('empleado_id')
+
+            # Verificar si se proporcionó el ID del empleado
+            if not empleado_id:
+                return Response({'error': 'El parámetro de consulta "empleado_id" es obligatorio en la solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Obtener el empleado y los pedidos asignados a él
+            empleado = Empleado.objects.get(id=empleado_id)
+            pedidos_asignados = Pedido.objects.filter(empleado=empleado)
+
+            # Crear una lista de diccionarios con la información de cada pedido asignado
+            lista_pedidos_asignados = []
+            for pedido in pedidos_asignados:
+                pedido_info = {
+                    'id': pedido.id,
+                    'precio_total': pedido.precio_total,
+                    'fecha_pedido': pedido.fecha_pedido,
+                    'fecha_entrega': pedido.fecha_entrega,
+                    'estado': pedido.estado,
+                    'direccion': pedido.direccion,
+                    'foodtruck': pedido.foodtruck.nombre,
+                    'usuario': pedido.usuario.username,
+                }
+                lista_pedidos_asignados.append(pedido_info)
+
+            return Response({'pedidos_asignados': lista_pedidos_asignados}, status=status.HTTP_200_OK)
+
+        except ObjectDoesNotExist:
+            return Response({'error': 'Empleado no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'error': 'Se esperaba una solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
+
+# JSON FE: {"user": "dfg161"}
+# JSON BE: {'repartidores': []}
+@api_view(['GET'])
+def obtener_repartidores(request):
+    if request.method == 'GET':
+        try:
+            # Obtener el empleado que realiza la solicitud
+            usuario_solicitante = request.data.get('user')
+            usuario_id = Usuario.objects.get(username = usuario_solicitante)
+            empleado_solicitante = Empleado.objects.get(usuario_id=usuario_id)
+
+            # Verificar si el empleado tiene asignado un FoodTruck
+            if empleado_solicitante.foodtruck is None:
+                return Response({'error': 'El empleado no tiene asignado un FoodTruck'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Obtener todos los empleados que pertenecen al mismo FoodTruck del empleado solicitante
+            empleados = Empleado.objects.filter(foodtruck=empleado_solicitante.foodtruck, rol="Repartidor")
+
+            # Crear una lista de diccionarios con los atributos de cada empleado
+            lista_empleados = []
+            for empleado in empleados:
+                empleado_info = {
+                    'id': empleado.id,
+                    'nombre': empleado.nombre,
+                    'rol': empleado.rol,
+                    'foodtruck': empleado.foodtruck.nombre,
+                    'usuario': empleado.usuario.username,
+                }
+                lista_empleados.append(empleado_info)
+
+            return Response({'repartidores': lista_empleados}, status=status.HTTP_200_OK)
+
+        except Usuario.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Empleado.DoesNotExist:
+            return Response({'error': 'Empleado no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': 'Ocurrió un error al procesar la solicitud.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({'error': 'Se esperaba una solicitud GET'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PATCH'])
+def entregar_pedido(request):
+    if request.method == 'PATCH':
+        try:
+            # Obtener el pedido_id del cuerpo de la solicitud
+            pedido_id = request.data.get('pedido_id')
+            estado_pedido = request.data.get('estado_pedido')
+
+            # Verificar si se proporcionó el ID del pedido
+            if not pedido_id:
+                return Response({'error': 'El ID del pedido es obligatorio en la solicitud PATCH'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Obtener el pedido y actualizar su estado a "Entregado"
+            pedido = Pedido.objects.get(id=pedido_id)
+            pedido.estado = estado_pedido
+            pedido.fecha_entrega = datetime.now()
+            pedido.save()
+
+            return Response({'mensaje': 'Estado del pedido actualizado exitosamente'}, status=status.HTTP_200_OK)
+
+        except Pedido.DoesNotExist:
+            return Response({'error': 'Pedido no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'error': 'Se esperaba una solicitud PATCH'}, status=status.HTTP_400_BAD_REQUEST)
+
+# JSON FE: { "productos": [ {"id": 6, "cantidad": 2, "foodtruck_id": 2}, {"id": 7, "cantidad": 1, "foodtruck_id": 2}, {"id": 8, "cantidad": 3, "foodtruck_id": 2} ], "direccion": "Calle Principal 123", "user": "testUser"}
+# JSON BE: {'mensaje feo'}
+@api_view(['POST'])
+def realizar_pedido(request):
+
+    if request.method == 'POST':
+        # Obtener los datos del cuerpo de la solicitud POST
+        data = request.data
+
+        # Obtener el nombre de usuario del cuerpo de la solicitud
+        username = data.get('user')
+
+        try:
+            # Obtener el objeto Usuario basado en el nombre de usuario
+            usuario = Usuario.objects.get(username=username)
+
+            # Crear un objeto Pedido
+            pedido = Pedido.objects.create(
+                precio_total=0,  # Puedes calcular esto más tarde
+                direccion=data['direccion'],
+                foodtruck_id=data['productos'][0]['foodtruck_id'],  # Supongamos que todos los productos pertenecen al mismo foodtruck
+                usuario=usuario
+            )
+
+            # Inicializar el total del pedido
+            total_pedido = 0
+
+            # Iterar sobre los productos en la solicitud y crear DetallesPedido
+            for producto_data in data['productos']:
+                producto_id = producto_data['id']
+                cantidad = producto_data['cantidad']
+
+                producto = Producto.objects.get(id=producto_id)
+
+                DetallesPedido.objects.create(
+                    cantidad=cantidad,
+                    pedido=pedido,
+                    producto=producto
+                )
+
+                # Calcular el costo del producto y sumarlo al total del pedido
+                total_pedido += producto.precio * cantidad
+
+            # Actualizar el total del pedido
+            pedido.precio_total = total_pedido
+            pedido.fecha_pedido = datetime.now()
+            pedido.save()
+
+            return Response({'success': 'Pedido realizado con éxito'}, status=status.HTTP_201_CREATED)
+
+        except Usuario.DoesNotExist:
+            return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'error': 'Se esperaba una solicitud POST'}, status=status.HTTP_400_BAD_REQUEST)
