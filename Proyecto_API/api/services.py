@@ -16,7 +16,7 @@ def sendEmail(email, type, token_or_password=None):
     # Configuración del mensaje
     if type == "register":
         subject = 'Verificacion de la cuenta FoodTrucks'
-        body = f"Entras al siguiente enlace para verificar la cuenta: http://127.0.0.1:8000/api/cuenta/verificar/?token={token_or_password}"
+        body = f"Entras al siguiente enlace para verificar la cuenta: http://127.0.0.1:8000/api/cliente/verificar/?token={token_or_password}"
     if type == "recover_password":
         subject = 'Recuerar password de la cuenta de FoodTrucks'
         body = f"Tu contraseña es la siguiente: {token_or_password}"
